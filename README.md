@@ -1,7 +1,7 @@
 # CDN Metrics ELT — Airflow · dbt · Snowflake
 
-[![CI](https://github.com/<GITHUB_USER>/cdn-elt-snowflake/actions/workflows/ci.yml/badge.svg)](https://github.com/<GITHUB_USER>/cdn-elt-snowflake/actions/workflows/ci.yml)
-[![dbt docs](https://img.shields.io/badge/dbt_docs-GitHub_Pages-FF694B?logo=dbt&logoColor=white)](https://<GITHUB_USER>.github.io/cdn-elt-snowflake/)
+[![CI](https://github.com/Djewiet/cdn-elt-snowflake/actions/workflows/ci.yml/badge.svg)](https://github.com/Djewiet/cdn-elt-snowflake/actions/workflows/ci.yml)
+[![dbt docs](https://img.shields.io/badge/dbt_docs-GitHub_Pages-FF694B?logo=dbt&logoColor=white)](https://djewiet.github.io/cdn-elt-snowflake/)
 ![Airflow](https://img.shields.io/badge/Airflow-3.4-017CEE?logo=apacheairflow&logoColor=white)
 ![dbt](https://img.shields.io/badge/dbt_Core-1.12-FF694B?logo=dbt&logoColor=white)
 ![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white)
@@ -128,7 +128,7 @@ make lint test
 |---|---|
 | ![DAG](docs/images/airflow_dag.png) | ![Lineage](docs/images/dbt_lineage.png) |
 -->
-Live documentation and lineage graph: **[dbt docs](https://<GITHUB_USER>.github.io/cdn-elt-snowflake/)**.
+Live documentation and lineage graph: **[dbt docs](https://djewiet.github.io/cdn-elt-snowflake/)**.
 
 ## Repository layout
 
