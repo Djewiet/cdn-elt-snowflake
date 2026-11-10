@@ -12,14 +12,40 @@ turns raw requests into a tested star schema that answers the questions a CDN
 team asks every day: **what is our cache offload, where are errors coming from,
 and is each edge POP meeting its latency SLO?**
 
-![Architecture](docs/images/architecture.png)
+```mermaid
+flowchart LR
+    GEN["CDN edge logs<br/><i>synthetic, deterministic per hour</i>"]
+
+    subgraph AF["Airflow 3 · hourly, catchup"]
+        direction TB
+        E["extract_to_s3"] --> L["load_to_snowflake<br/>DELETE + COPY INTO"]
+        L --> F["dbt source freshness"] --> B["dbt build<br/>(1-hour window)"]
+    end
+
+    S3[("S3 landing<br/>Parquet, partitioned<br/>dt= / hour=")]
+
+    subgraph SF["Snowflake"]
+        direction TB
+        RAW[("RAW.CDN.HTTP_LOGS")] --> STG["staging"] --> INT["intermediate"] --> M["marts<br/>star schema + SLO report"]
+    end
+
+    BI["BI / analysts<br/>CDN_REPORTER"]
+
+    GEN --> E
+    E -- Parquet --> S3
+    S3 -- "stage + storage integration" --> RAW
+    B -. "SQL" .-> STG
+    M --> BI
+```
+
+CI on GitHub Actions lints and tests every change (Ruff, SQLFluff, pytest, DAG integrity), runs `dbt build` on DuckDB and on Snowflake in an isolated schema, and publishes the dbt docs to GitHub Pages.
 
 ## Highlights
 
 | Concern | How it is handled |
 |---|---|
 | **Idempotency** | One DAG run = one hour. The source is deterministic per hour, the S3 key derives from the data interval, and the load runs `DELETE` + `COPY INTO … FORCE` in a single transaction. Retries and backfills never duplicate rows. |
-| **Backfill** | `catchup=True`, `max_active_runs=4`. dbt receives the run's interval as vars, so each run rebuilds exactly its own hour, in any order. dbt runs are serialized through a 1-slot pool. |
+| **Backfill** | `catchup=True`, `max_active_runs=4`, explicit `CronDataIntervalTimetable` (true 1-hour intervals). dbt receives the run's interval as vars, so each run rebuilds exactly its own hour, in any order. dbt runs are serialized through a 1-slot pool. |
 | **Load correctness** | The load task compares `rows_loaded` returned by `COPY INTO` with the extracted row count and fails on any mismatch. Lineage columns (`_source_file`, `_loaded_at`) come from `INCLUDE_METADATA`. |
 | **Modelling** | staging → intermediate → marts. Transaction fact (1 row/request), periodic snapshot fact (hour × POP × content category), conformed dimensions, daily SLO report. Incremental `delete+insert` with late-data lookback. |
 | **Data quality** | 53 data tests: `unique`, `not_null`, `relationships`, `accepted_values`, `dbt_utils` range and expression tests, a singular reconciliation test (hourly snapshot = request fact) and a dbt **unit test** on classification rules. Source freshness gate in the DAG. |
@@ -123,11 +149,7 @@ make lint test
 
 ## Screenshots
 
-<!-- After your first backfill, save the two captures and uncomment:
-| Airflow DAG (grid view after backfill) | dbt lineage graph |
-|---|---|
-| ![DAG](docs/images/airflow_dag.png) | ![Lineage](docs/images/dbt_lineage.png) |
--->
+<!-- Add once captured: ![Airflow grid view after backfill](docs/images/airflow_grid.png) -->
 Live documentation and lineage graph: **[dbt docs](https://djewiet.github.io/cdn-elt-snowflake/)**.
 
 ## Repository layout
@@ -154,6 +176,7 @@ Live documentation and lineage graph: **[dbt docs](https://djewiet.github.io/cdn
 - **ELT, not ETL.** Raw data lands untouched in `RAW`; every transformation is versioned SQL in dbt, testable and documented.
 - **Why delete+insert.** It rebuilds a whole time window atomically and behaves the same on Snowflake and DuckDB, which keeps the offline CI meaningful.
 - **Why dbt in its own virtualenv.** Airflow and dbt pin conflicting dependencies; isolating dbt avoids breaking either on upgrade.
+- **Explicit data intervals (an Airflow 3 pitfall).** In Airflow 3 a cron string maps to `CronTriggerTimetable`, whose data interval starts and ends at the same instant. With interval-scoped incremental models, every run after the first full build succeeded while processing nothing. It surfaced as marts covering 4 hours while `RAW` held 60. The fix is threefold: the DAG declares a `CronDataIntervalTimetable`, the extract task fails on any interval that is not exactly one hour, and the `incremental_window` macro raises on an empty window. A DAG test now asserts contiguous one-hour intervals.
 - **Ratios are recomputed, never averaged.** Daily KPIs come from summed counts; the SLO is evaluated at hour × POP grain so tiny groups cannot dominate it.
 
 ## Possible next steps
