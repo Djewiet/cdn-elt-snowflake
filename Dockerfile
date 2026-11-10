@@ -6,6 +6,13 @@ ARG AIRFLOW_VERSION
 ARG PYTHON_VERSION
 ARG DBT_SNOWFLAKE_VERSION=1.12.5
 
+# The base image runs as the unprivileged `airflow` user: prepare the folders
+# we install into as root, then hand them over.
+USER root
+RUN mkdir -p /opt/dbt-venv /opt/cdn_logs \
+ && chown -R airflow:root /opt/dbt-venv /opt/cdn_logs
+USER airflow
+
 # Airflow providers, pinned against the official constraints file.
 COPY requirements-airflow.txt /tmp/requirements-airflow.txt
 RUN pip install --no-cache-dir -r /tmp/requirements-airflow.txt \
