@@ -1,0 +1,25 @@
+# secrets & env
+.env
+secrets/
+*.p8
+*.pem
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/.user.yml
+
+# local data
+data/
+
+# airflow
+logs/

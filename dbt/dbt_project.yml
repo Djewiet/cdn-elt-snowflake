@@ -1,0 +1,59 @@
+name: cdn_analytics
+version: "1.0.0"
+config-version: 2
+profile: cdn_analytics
+require-dbt-version: [">=1.10.0", "<2.0.0"]
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+analysis-paths: ["analyses"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages", "logs"]
+
+vars:
+  # Incremental window. Airflow passes the run's data interval so that a
+  # backfill of any past hour rebuilds exactly that hour (out-of-order safe).
+  # Without them, models fall back to "max loaded hour - lookback_hours".
+  interval_start: null
+  interval_end: null
+  lookback_hours: 3
+  # Calendar range for dim_date
+  date_spine_start: "2026-01-01"
+  date_spine_end: "2027-12-31"
+
+flags:
+  require_explicit_package_overrides_for_builtin_materializations: true
+
+models:
+  cdn_analytics:
+    +persist_docs: {relation: true, columns: true}
+    staging:
+      +schema: staging
+      +materialized: view
+    intermediate:
+      +schema: intermediate
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table
+      +tags: ["marts"]
+
+seeds:
+  cdn_analytics:
+    +schema: reference
+    edge_pops:
+      +column_types:
+        latitude: float
+        longitude: float
+        utc_offset_hours: integer
+    http_status_codes:
+      +column_types:
+        http_status: integer
+
+data_tests:
+  cdn_analytics:
+    +severity: error
+    +store_failures: "{{ target.name == 'prod' }}"
+    +schema: test_failures

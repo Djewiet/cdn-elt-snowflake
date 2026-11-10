@@ -1,0 +1,15 @@
+http_status,status_text,status_class,is_error,is_server_error
+200,OK,2xx,false,false
+204,No Content,2xx,false,false
+206,Partial Content,2xx,false,false
+301,Moved Permanently,3xx,false,false
+302,Found,3xx,false,false
+304,Not Modified,3xx,false,false
+400,Bad Request,4xx,true,false
+403,Forbidden,4xx,true,false
+404,Not Found,4xx,true,false
+429,Too Many Requests,4xx,true,false
+500,Internal Server Error,5xx,true,true
+502,Bad Gateway,5xx,true,true
+503,Service Unavailable,5xx,true,true
+504,Gateway Timeout,5xx,true,true

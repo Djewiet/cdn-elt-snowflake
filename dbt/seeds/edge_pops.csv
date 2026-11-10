@@ -1,0 +1,9 @@
+pop_code,pop_name,city,country_code,region,latitude,longitude,utc_offset_hours
+CMN,Casablanca,Casablanca,MA,Africa,33.5731,-7.5898,1
+ABJ,Abidjan,Abidjan,CI,Africa,5.3600,-4.0083,0
+DKR,Dakar,Dakar,SN,Africa,14.7167,-17.4677,0
+LOS,Lagos,Lagos,NG,Africa,6.5244,3.3792,1
+CDG,Paris,Paris,FR,Europe,48.8566,2.3522,1
+FRA,Frankfurt,Frankfurt,DE,Europe,50.1109,8.6821,1
+IAD,Ashburn,Ashburn,US,North America,39.0438,-77.4874,-5
+SIN,Singapore,Singapore,SG,Asia Pacific,1.3521,103.8198,8

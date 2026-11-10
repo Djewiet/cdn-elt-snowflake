@@ -1,0 +1,79 @@
+name: dbt docs
+
+# Publishes the dbt documentation site (lineage graph, model and column docs,
+# tests) to GitHub Pages on every push to main.
+# With Snowflake secrets configured, the catalog comes from the production
+# warehouse; otherwise it is built from the offline DuckDB target.
+
+on:
+  push:
+    branches: [main]
+    paths: ["dbt/**", ".github/workflows/docs.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Generate docs from Snowflake (prod catalog)
+        if: env.SNOWFLAKE_ACCOUNT != ''
+        working-directory: dbt
+        env:
+          DBT_TARGET: prod
+          SNOWFLAKE_PRIVATE_KEY_PATH: ${{ runner.temp }}/rsa_key.p8
+          SNOWFLAKE_PRIVATE_KEY_PEM: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+        run: |
+          printf '%s\n' "$SNOWFLAKE_PRIVATE_KEY_PEM" > "$SNOWFLAKE_PRIVATE_KEY_PATH"
+          chmod 600 "$SNOWFLAKE_PRIVATE_KEY_PATH"
+          pip install "dbt-snowflake==1.12.5"
+          dbt deps
+          dbt docs generate --static
+          rm -f "$SNOWFLAKE_PRIVATE_KEY_PATH"
+
+      - name: Generate docs from DuckDB (no warehouse configured)
+        if: env.SNOWFLAKE_ACCOUNT == ''
+        run: |
+          pip install -e ".[dev]"
+          python scripts/load_local_duckdb.py --hours 72
+          cd dbt && dbt deps && dbt build --target local && dbt docs generate --static --target local
+
+      - name: Assemble site
+        run: |
+          mkdir -p site
+          cp dbt/target/static_index.html site/index.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

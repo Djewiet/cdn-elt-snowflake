@@ -1,0 +1,39 @@
+# All secrets come from environment variables: nothing sensitive is committed.
+# Snowflake auth uses an RSA key pair (password-only auth is being phased out
+# for service users): a key file in Airflow (prod), the PEM content in CI.
+cdn_analytics:
+  target: "{{ env_var('DBT_TARGET', 'local') }}"
+  outputs:
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER', 'SVC_CDN_TRANSFORMER') }}"
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH', '/opt/airflow/secrets/transformer_rsa_key.p8') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'CDN_TRANSFORMER') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'CDN_WH') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'ANALYTICS') }}"
+      schema: core
+      threads: 8
+      query_tag: dbt_cdn_analytics
+      client_session_keep_alive: false
+
+    # Ephemeral CI schema, isolated per pull request (see .github/workflows/ci.yml)
+    ci:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER', 'SVC_CDN_TRANSFORMER') }}"
+      private_key: "{{ env_var('SNOWFLAKE_PRIVATE_KEY', '') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'CDN_TRANSFORMER') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'CDN_WH') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'ANALYTICS') }}"
+      schema: "{{ env_var('DBT_CI_SCHEMA', 'ci') }}"
+      threads: 8
+      query_tag: dbt_cdn_analytics_ci
+
+    # Offline target: same models on DuckDB, no cloud account needed.
+    # Used for fast local iteration and for CI on forks (no secrets).
+    local:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '../data/cdn_local.duckdb') }}"
+      schema: core
+      threads: 4

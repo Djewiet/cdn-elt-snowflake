@@ -1,0 +1,31 @@
+version: 2
+
+sources:
+  - name: cdn
+    description: >
+      Raw CDN access logs landed hourly by Airflow (object storage → COPY INTO).
+      One row per HTTP request served by an edge POP. Loaded as-is, never mutated.
+    database: "{{ 'RAW' if target.type == 'snowflake' else target.database }}"
+    schema: "{{ 'CDN' if target.type == 'snowflake' else 'raw_cdn' }}"
+    config:
+      loaded_at_field: _loaded_at
+      freshness:
+        warn_after: {count: 2, period: hour}
+        error_after: {count: 6, period: hour}
+    tables:
+      - name: http_logs
+        identifier: "{{ 'HTTP_LOGS' if target.type == 'snowflake' else 'http_logs' }}"
+        description: Raw HTTP request logs, one Parquet file per hour.
+        columns:
+          - name: request_id
+            description: Unique id assigned by the edge to the request.
+            data_tests: [not_null]
+          - name: event_ts
+            description: Request timestamp (UTC).
+            data_tests: [not_null]
+          - name: edge_pop
+            description: Code of the edge POP that served the request.
+          - name: _source_file
+            description: Object-storage key the row was loaded from (lineage).
+          - name: _loaded_at
+            description: Load timestamp set by COPY INTO (UTC).

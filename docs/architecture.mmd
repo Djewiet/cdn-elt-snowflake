@@ -1,0 +1,38 @@
+flowchart LR
+    subgraph SRC["Source"]
+        GEN["CDN edge logs<br/>(synthetic, deterministic per hour)"]
+    end
+
+    subgraph ORCH["Airflow 3 · Docker Compose · @hourly, catchup"]
+        direction TB
+        T1["extract_to_s3"] --> T2["load_to_snowflake<br/>DELETE + COPY INTO<br/>row-count reconciliation"]
+        T2 --> T3["dbt source freshness"] --> T4["dbt build<br/>(interval-scoped vars)"]
+    end
+
+    subgraph LAKE["AWS S3 landing"]
+        S3[("s3://bucket/cdn_logs/<br/>dt=YYYY-MM-DD/hour=HH/*.parquet")]
+    end
+
+    subgraph SF["Snowflake"]
+        direction TB
+        RAW[("RAW.CDN.HTTP_LOGS")]
+        STG["STAGING<br/>stg_cdn__http_logs"]
+        INT["INTERMEDIATE<br/>int_cdn_requests_classified"]
+        MARTS["MARTS · star schema<br/>fct_cdn_requests · fct_cdn_hourly_metrics<br/>dim_edge_pop · dim_date · dim_http_status<br/>rpt_pop_daily_health"]
+        RAW --> STG --> INT --> MARTS
+    end
+
+    subgraph CI["GitHub Actions"]
+        direction TB
+        C1["ruff · SQLFluff · pytest"]
+        C2["dbt build on DuckDB (offline)"]
+        C3["dbt build on Snowflake (per-PR schema)"]
+        C4["dbt docs → GitHub Pages"]
+    end
+
+    GEN --> T1
+    T1 -- Parquet --> S3
+    S3 -- "external stage +<br/>storage integration" --> RAW
+    T4 -. transforms .-> STG
+    MARTS --> BI["BI / dashboards<br/>(CDN_REPORTER role)"]
+    CI -. validates .-> SF

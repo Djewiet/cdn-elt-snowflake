@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  AIRFLOW_VERSION: "3.4.0"
+  DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Static checks + offline dbt build on DuckDB (no secrets: runs on forks too)
+  # ---------------------------------------------------------------------------
+  quality:
+    name: Lint, unit tests, dbt build (DuckDB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev]" sqlfluff-templater-dbt
+
+      - name: Ruff
+        run: |
+          ruff check --output-format=github .
+          ruff format --check .
+
+      - name: Unit tests (generator)
+        run: pytest -q tests/test_generator.py
+
+      - name: dbt deps
+        working-directory: dbt
+        run: dbt deps
+
+      - name: Load 72h of synthetic logs into DuckDB
+        run: python scripts/load_local_duckdb.py --hours 72
+
+      - name: SQLFluff
+        working-directory: dbt
+        run: sqlfluff lint models tests --format github-annotation-native
+
+      - name: dbt build (DuckDB)
+        working-directory: dbt
+        run: dbt build --target local
+
+      - name: dbt build again (incremental path)
+        working-directory: dbt
+        run: dbt build --target local --select fct_cdn_requests+
+
+  # ---------------------------------------------------------------------------
+  # 2. Airflow DAG integrity (parse + structure) against the pinned Airflow
+  # ---------------------------------------------------------------------------
+  dag-integrity:
+    name: Airflow DAG integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install Airflow + providers (constraints)
+        run: |
+          pip install "apache-airflow==${AIRFLOW_VERSION}" -r requirements-airflow.txt pytest \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+          pip install --no-deps -e .
+      - name: DAG tests
+        run: pytest -q tests/test_dag_integrity.py
+
+  # ---------------------------------------------------------------------------
+  # 3. dbt build on Snowflake, in a schema isolated per PR (skipped on forks)
+  # ---------------------------------------------------------------------------
+  dbt-snowflake:
+    name: dbt build (Snowflake)
+    needs: [quality]
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      DBT_TARGET: ci
+      DBT_CI_SCHEMA: ${{ github.event_name == 'pull_request' && format('ci_pr_{0}', github.event.number) || 'ci_main' }}
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Skip if Snowflake secrets are not configured
+        id: guard
+        run: |
+          if [ -z "$SNOWFLAKE_ACCOUNT" ]; then
+            echo "::notice::Snowflake secrets not set — skipping the warehouse build."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install dbt-snowflake
+        if: steps.guard.outputs.enabled == 'true'
+        run: pip install "dbt-snowflake==1.12.5"
+      - name: dbt deps
+        if: steps.guard.outputs.enabled == 'true'
+        working-directory: dbt
+        run: dbt deps
+      - name: dbt build (full refresh into ${{ env.DBT_CI_SCHEMA }})
+        if: steps.guard.outputs.enabled == 'true'
+        working-directory: dbt
+        run: dbt build --full-refresh
+      - name: Drop CI schemas
+        if: always() && steps.guard.outputs.enabled == 'true' && github.event_name == 'pull_request'
+        working-directory: dbt
+        run: |
+          dbt run-operation drop_schemas_with_prefix --args "{prefix: '${DBT_CI_SCHEMA}'}"

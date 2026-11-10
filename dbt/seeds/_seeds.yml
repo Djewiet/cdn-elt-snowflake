@@ -1,0 +1,25 @@
+version: 2
+
+seeds:
+  - name: edge_pops
+    description: Reference list of CDN edge points of presence (POPs).
+    columns:
+      - name: pop_code
+        description: IATA-style code of the POP (natural key).
+        data_tests: [unique, not_null]
+      - name: region
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["Africa", "Europe", "North America", "Asia Pacific"]
+
+  - name: http_status_codes
+    description: HTTP status codes with their class and error flags.
+    columns:
+      - name: http_status
+        data_tests: [unique, not_null]
+      - name: status_class
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["1xx", "2xx", "3xx", "4xx", "5xx"]

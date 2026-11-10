@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: int_cdn_requests_classified
+    description: >
+      Requests enriched with business classifications (content category,
+      device type, cache and error flags) and hourly/daily buckets.
+    columns:
+      - name: request_id
+        data_tests: [unique, not_null]
+      - name: content_category
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["image", "video", "script", "stylesheet", "api", "html", "other"]
+      - name: device_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["bot", "mobile", "desktop", "other"]
+
+unit_tests:
+  - name: test_request_classification_rules
+    description: Content-type, user-agent and cache rules are applied as documented.
+    model: int_cdn_requests_classified
+    given:
+      - input: ref('stg_cdn__http_logs')
+        rows:
+          - {request_id: r1, requested_at: "2026-11-07 14:59:59", content_type: image/webp, user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)", cache_status: HIT, http_status: 200}
+          - {request_id: r2, requested_at: "2026-11-07 15:00:00", content_type: application/json, user_agent: "Mozilla/5.0 (compatible; Googlebot/2.1)", cache_status: BYPASS, http_status: 503}
+          - {request_id: r3, requested_at: "2026-11-07 15:30:00", content_type: text/css, user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", cache_status: MISS, http_status: 404}
+          - {request_id: r4, requested_at: "2026-11-07 15:30:00", content_type: font/woff2, user_agent: "curl/8.9.1", cache_status: EXPIRED, http_status: 304}
+    expect:
+      rows:
+        - {request_id: r1, request_hour: "2026-11-07 14:00:00", content_category: image, device_type: mobile, is_cacheable: true, is_cache_hit: true, is_client_error: false, is_server_error: false}
+        - {request_id: r2, request_hour: "2026-11-07 15:00:00", content_category: api, device_type: bot, is_cacheable: false, is_cache_hit: false, is_client_error: false, is_server_error: true}
+        - {request_id: r3, request_hour: "2026-11-07 15:00:00", content_category: stylesheet, device_type: desktop, is_cacheable: true, is_cache_hit: false, is_client_error: true, is_server_error: false}
+        - {request_id: r4, request_hour: "2026-11-07 15:00:00", content_category: other, device_type: bot, is_cacheable: true, is_cache_hit: false, is_client_error: false, is_server_error: false}

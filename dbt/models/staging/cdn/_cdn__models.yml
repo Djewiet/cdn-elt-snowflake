@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: stg_cdn__http_logs
+    description: >
+      Cleaned, typed and de-duplicated CDN request logs. 1 row = 1 request.
+      Only renaming, casting and normalisation happen here; no business logic.
+    columns:
+      - name: request_id
+        description: Primary key.
+        data_tests: [unique, not_null]
+      - name: requested_at
+        description: Request timestamp (UTC).
+        data_tests: [not_null]
+      - name: pop_code
+        data_tests: [not_null]
+      - name: http_status
+        data_tests: [not_null]
+      - name: cache_status
+        description: Edge cache outcome.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["HIT", "MISS", "EXPIRED", "BYPASS"]
+      - name: http_method
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+      - name: bytes_sent
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: response_time_ms
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
