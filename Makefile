@@ -45,7 +45,7 @@ up: ## Build the image, initialise Airflow and start the stack
 	@echo "Airflow UI: http://localhost:8080"
 
 seed: ## Load dbt seeds and dimensions in Snowflake (run once after `up`)
-	$(RUN_DBT) "cd /opt/airflow/dbt && /opt/dbt-venv/bin/dbt build --target prod --select resource_type:seed dim_date dim_edge_pop dim_http_status"
+	$(RUN_DBT) "cd /opt/airflow/dbt && /opt/dbt-venv/bin/dbt build --target prod --select resource_type:seed dim_date dim_edge_pop dim_http_status --indirect-selection cautious"
 
 backfill: ## Backfill a range, e.g. make backfill FROM=2026-11-01T00:00:00 TO=2026-11-02T00:00:00
 	$(COMPOSE) exec airflow-scheduler airflow backfill create --dag-id cdn_elt_hourly \
