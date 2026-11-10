@@ -63,8 +63,9 @@ services:
 
   airflow-init:
     <<: *airflow-common
-    entrypoint: /bin/bash
+    # Keep the image's entrypoint: it registers the host UID as a user.
     command:
+      - bash
       - -c
       - |
         set -euo pipefail
