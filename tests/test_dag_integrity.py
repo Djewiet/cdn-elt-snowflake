@@ -35,6 +35,28 @@ def test_dag_structure(dagbag):
     }
 
 
+def test_runs_cover_exactly_one_hour(dagbag):
+    """Guards against Airflow 3's CronTriggerTimetable default (zero-length
+    intervals), which would turn every interval-scoped dbt run into a no-op."""
+    from datetime import UTC, datetime, timedelta
+
+    from airflow.timetables.base import TimeRestriction
+
+    dag = dagbag.dags.get("cdn_elt_hourly")
+    start = datetime(2026, 11, 8, tzinfo=UTC)
+    first = dag.timetable.next_dagrun_info(
+        last_automated_data_interval=None,
+        restriction=TimeRestriction(earliest=start, latest=None, catchup=True),
+    )
+    assert first.data_interval.start == start
+    assert first.data_interval.end - first.data_interval.start == timedelta(hours=1)
+    second = dag.timetable.next_dagrun_info(
+        last_automated_data_interval=first.data_interval,
+        restriction=TimeRestriction(earliest=start, latest=None, catchup=True),
+    )
+    assert second.data_interval.start == first.data_interval.end
+
+
 def test_dbt_tasks_are_serialized(dagbag):
     dag = dagbag.dags.get("cdn_elt_hourly")
     assert {t.pool for t in dag.tasks if t.task_id.startswith("dbt_")} == {"dbt"}

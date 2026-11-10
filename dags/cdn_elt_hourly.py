@@ -2,7 +2,10 @@
 
 Design choices
 --------------
-* One DAG run == one hour of data (the run's data interval). The source is
+* One DAG run == one hour of data (the run's data interval). The schedule is
+  an explicit ``CronDataIntervalTimetable``: Airflow 3's default for cron
+  strings (``CronTriggerTimetable``) gives a zero-length interval, which
+  would make every interval-scoped dbt run a silent no-op. The source is
   deterministic per hour, the S3 key is derived from the interval and the
   Snowflake load replaces that file's rows inside a transaction, so every
   task is idempotent: retries and backfills never duplicate data.
@@ -25,6 +28,7 @@ from datetime import datetime, timedelta
 
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.sdk import Asset, dag, task
+from airflow.timetables.interval import CronDataIntervalTimetable
 
 log = logging.getLogger(__name__)
 
@@ -91,7 +95,7 @@ default_args = {
 @dag(
     dag_id="cdn_elt_hourly",
     description="Hourly CDN logs ELT: S3 landing → Snowflake RAW → dbt marts",
-    schedule="@hourly",
+    schedule=CronDataIntervalTimetable("0 * * * *", timezone="UTC"),
     start_date=START_DATE,
     catchup=True,
     max_active_runs=4,
@@ -102,13 +106,19 @@ default_args = {
 def cdn_elt_hourly():
 
     @task
-    def extract_to_s3(data_interval_start: datetime | None = None) -> dict:
+    def extract_to_s3(
+        data_interval_start: datetime | None = None, data_interval_end: datetime | None = None
+    ) -> dict:
         """Generate the hour's logs and upload them as Parquet to S3."""
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
         from cdn_logs.generator import generate_hour, partition_key
         from cdn_logs.parquet import to_parquet_bytes
 
+        if data_interval_end - data_interval_start != timedelta(hours=1):
+            raise ValueError(
+                f"Expected a 1-hour data interval, got {data_interval_start} → {data_interval_end}"
+            )
         records = generate_hour(data_interval_start)
         key = f"{LANDING_PREFIX}/{partition_key(data_interval_start)}"
         S3Hook(aws_conn_id=AWS_CONN_ID).load_bytes(

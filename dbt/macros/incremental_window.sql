@@ -9,6 +9,12 @@
 #}
 {% macro incremental_window(source_column, target_column=none) %}
     {%- set target_column = target_column or source_column -%}
+    {%- if var('interval_start') and var('interval_end') and var('interval_start') >= var('interval_end') -%}
+        {{ exceptions.raise_compiler_error(
+            "Empty incremental window: interval_start (" ~ var('interval_start')
+            ~ ") must be before interval_end (" ~ var('interval_end') ~ ")"
+        ) }}
+    {%- endif -%}
     {%- if var('interval_start') and var('interval_end') -%}
         {{ source_column }} >= cast('{{ var("interval_start") }}' as timestamp)
         and {{ source_column }} < cast('{{ var("interval_end") }}' as timestamp)
