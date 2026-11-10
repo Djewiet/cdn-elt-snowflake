@@ -14,28 +14,27 @@ and is each edge POP meeting its latency SLO?**
 
 ```mermaid
 flowchart LR
-    GEN["CDN edge logs<br/><i>synthetic, deterministic per hour</i>"]
+    GEN["CDN edge logs<br/><i>synthetic, hourly</i>"]
 
     subgraph AF["Airflow 3 · hourly, catchup"]
         direction TB
         E["extract_to_s3"] --> L["load_to_snowflake<br/>DELETE + COPY INTO"]
-        L --> F["dbt source freshness"] --> B["dbt build<br/>(1-hour window)"]
+        L --> F["dbt source freshness"] --> B["dbt build<br/>1-hour window"]
     end
 
-    S3[("S3 landing<br/>Parquet, partitioned<br/>dt= / hour=")]
+    S3[("S3 landing<br/>Parquet<br/>dt= / hour=")]
 
-    subgraph SF["Snowflake"]
+    subgraph SF["Snowflake · transformed by dbt"]
         direction TB
-        RAW[("RAW.CDN.HTTP_LOGS")] --> STG["staging"] --> INT["intermediate"] --> M["marts<br/>star schema + SLO report"]
+        RAW[("RAW.CDN.HTTP_LOGS")] --> STG["staging"] --> INT["intermediate"] --> M["marts<br/>star schema + SLO"]
     end
 
-    BI["BI / analysts<br/>CDN_REPORTER"]
+    BI["BI / analysts"]
 
-    GEN --> E
-    E -- Parquet --> S3
-    S3 -- "stage + storage integration" --> RAW
-    B -. "SQL" .-> STG
-    M --> BI
+    GEN --> AF
+    AF -- "Parquet" --> S3
+    S3 -- "COPY INTO" --> SF
+    SF --> BI
 ```
 
 CI on GitHub Actions lints and tests every change (Ruff, SQLFluff, pytest, DAG integrity), runs `dbt build` on DuckDB and on Snowflake in an isolated schema, and publishes the dbt docs to GitHub Pages.
