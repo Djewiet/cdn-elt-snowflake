@@ -108,7 +108,7 @@ make lint test
 
 1. **Keys** — `make keys` creates an RSA key pair per service user in `./secrets` (git-ignored) and prints the public keys.
 2. **Snowflake** — in a [30-day trial](https://signup.snowflake.com/) worksheet, run [`snowflake/01_account_setup.sql`](snowflake/01_account_setup.sql) with the public keys pasted in.
-3. **S3 + IAM** — create the bucket and the two IAM policies in [`snowflake/aws/landing-bucket-policies.md`](snowflake/aws/landing-bucket-policies.md), then run [`snowflake/02_landing_s3.sql`](snowflake/02_landing_s3.sql) and copy the integration's IAM user ARN and external ID into the role's trust policy.
+3. **S3 + IAM** — `BUCKET=<name> REGION=<snowflake-region> ./scripts/aws_setup.sh bootstrap` creates the hardened bucket, the Airflow writer user and the role Snowflake assumes ([policies](snowflake/aws/landing-bucket-policies.md)). Run [`snowflake/02_landing_s3.sql`](snowflake/02_landing_s3.sql) with the printed values, then `./scripts/aws_setup.sh trust <STORAGE_AWS_IAM_USER_ARN> <STORAGE_AWS_EXTERNAL_ID>` with the output of `desc integration`, and `./scripts/aws_setup.sh verify`.
 4. **Config** — `cp .env.example .env` and fill in the AWS keys, bucket, Snowflake account identifier, Fernet key and JWT secret.
 5. **Run**
    ```bash
