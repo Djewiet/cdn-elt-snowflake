@@ -17,6 +17,5 @@ grant usage on schema analytics.marts to role cdn_reporter;
 grant select on all tables in schema analytics.marts to role cdn_reporter;
 grant select on all views in schema analytics.marts to role cdn_reporter;
 
--- Let the current user switch to CDN_REPORTER in Snowsight
-set me = current_user();
-grant role cdn_reporter to user identifier($me);
+-- ACCOUNTADMIN already inherits CDN_REPORTER (through SYSADMIN). Another user
+-- needs it granted explicitly:  grant role cdn_reporter to user <user_name>;

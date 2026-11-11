@@ -150,7 +150,7 @@ make lint test
 
 A Streamlit app running inside Snowflake ([`streamlit/app.py`](streamlit/app.py)) reads only the marts, as the read-only `CDN_REPORTER` role: KPI tiles, a POP × hour heatmap of 5xx rates against the 1 % SLO, cache hit ratio per POP, traffic by content type and the daily SLO report.
 
-<!-- Add once captured: ![Dashboard](docs/images/dashboard.png) -->
+![Dashboard](docs/images/dashboard.png)
 
 - **In Snowflake:** run [`snowflake/03_dashboard.sql`](snowflake/03_dashboard.sql), switch Snowsight to the `CDN_REPORTER` role, create a Streamlit app in `ANALYTICS.DASHBOARDS` on `CDN_WH` and paste `streamlit/app.py`.
 - **Offline:** `make local-build && make dashboard-local` serves the same app on the DuckDB build.
