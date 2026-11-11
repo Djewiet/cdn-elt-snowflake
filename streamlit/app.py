@@ -24,6 +24,16 @@ st.set_page_config(page_title="CDN operations", layout="wide")
 
 
 # --------------------------------------------------------------------- data
+def snowflake_session():
+    """Snowpark session in both Streamlit-in-Snowflake runtimes."""
+    try:  # warehouse runtime
+        from snowflake.snowpark.context import get_active_session
+
+        return get_active_session()
+    except Exception:  # container runtime
+        return st.connection("snowflake").session()
+
+
 def run_query(sql: str) -> pd.DataFrame:
     if DUCKDB_PATH:
         import duckdb
@@ -31,9 +41,7 @@ def run_query(sql: str) -> pd.DataFrame:
         with duckdb.connect(DUCKDB_PATH, read_only=True) as con:
             df = con.sql(sql).df()
     else:
-        from snowflake.snowpark.context import get_active_session
-
-        df = get_active_session().sql(sql).to_pandas()
+        df = snowflake_session().sql(sql).to_pandas()
     df.columns = [c.lower() for c in df.columns]
     return df
 
