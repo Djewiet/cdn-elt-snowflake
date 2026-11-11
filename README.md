@@ -146,6 +146,15 @@ make lint test
 
 </details>
 
+## Dashboard
+
+A Streamlit app running inside Snowflake ([`streamlit/app.py`](streamlit/app.py)) reads only the marts, as the read-only `CDN_REPORTER` role: KPI tiles, a POP × hour heatmap of 5xx rates against the 1 % SLO, cache hit ratio per POP, traffic by content type and the daily SLO report.
+
+<!-- Add once captured: ![Dashboard](docs/images/dashboard.png) -->
+
+- **In Snowflake:** run [`snowflake/03_dashboard.sql`](snowflake/03_dashboard.sql), switch Snowsight to the `CDN_REPORTER` role, create a Streamlit app in `ANALYTICS.DASHBOARDS` on `CDN_WH` and paste `streamlit/app.py`.
+- **Offline:** `make local-build && make dashboard-local` serves the same app on the DuckDB build.
+
 ## Screenshots
 
 <!-- Add once captured: ![Airflow grid view after backfill](docs/images/airflow_grid.png) -->
@@ -163,7 +172,8 @@ Live documentation and lineage graph: **[dbt docs](https://djewiet.github.io/cdn
 │   ├── macros/                   # incremental_window, schema naming, CI cleanup
 │   ├── seeds/                    # edge POPs, HTTP status codes
 │   └── tests/                    # singular reconciliation test
-├── snowflake/                    # RBAC, warehouse, resource monitor, stage, raw table, IAM
+├── streamlit/app.py              # dashboard (Streamlit in Snowflake, or local on DuckDB)
+├── snowflake/                    # RBAC, warehouse, resource monitor, stage, raw table, IAM, dashboard grants
 ├── tests/                        # pytest: generator + DAG integrity
 ├── scripts/load_local_duckdb.py  # offline raw layer for local dev and CI
 ├── .github/workflows/            # ci.yml, docs.yml

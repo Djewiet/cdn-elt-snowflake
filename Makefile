@@ -37,6 +37,9 @@ local-data: ## Load 72 hours of synthetic logs into a local DuckDB file
 local-build: local-data ## Run the whole dbt project offline on DuckDB
 	$(DBT_LOCAL) build
 
+dashboard-local: ## Run the Streamlit dashboard on the offline DuckDB build (after local-build)
+	CDN_DASHBOARD_DUCKDB=data/cdn_local.duckdb streamlit run streamlit/app.py
+
 # ------------------------------------------------------------------- airflow
 up: ## Build the image, initialise Airflow and start the stack
 	@test -f .env || (cp .env.example .env && echo "Created .env — fill it in" && exit 1)
@@ -62,4 +65,4 @@ clean: ## Stop the stack and delete volumes + local artefacts
 	$(COMPOSE) down -v
 	rm -rf dbt/target dbt/dbt_packages dbt/logs data/*.duckdb
 
-.PHONY: help install keys lint test local-data local-build up seed backfill docs down clean
+.PHONY: help install keys lint test local-data local-build dashboard-local up seed backfill docs down clean

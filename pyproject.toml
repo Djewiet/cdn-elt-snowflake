@@ -22,7 +22,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 110
 target-version = "py311"
-src = ["src", "dags", "tests", "scripts"]
+src = ["src", "dags", "tests", "scripts", "streamlit"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "AIR"]
